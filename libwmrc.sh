@@ -6,6 +6,7 @@ WMRC_CHECK_DEPS="${WMRC_CHECK_DEPS:-true}"
 LOG_FILE="/tmp/wmrc@$(whoami)${DISPLAY}.log"
 WMRC_CONFIG="$HOME/.config/wmrc"
 _pid_file="/tmp/wmrc::$(echo "$_module" | sed 's,/,::,g')@$(whoami)${DISPLAY}.pid"
+WMRC_EVENT_MODE="${WMRC_EVENT_MODE:-true}"
 
 export _module
 export DAEMON_PID
@@ -82,6 +83,17 @@ _module_libraries() {
     fi
 }
 
+_subscribes_to() {
+    if ! test -f "$WMRC_CONFIG/modules/$1"; then
+        error 'Module not found' "$WMRC_CONFIG/modules/$1"
+        exit 1
+    fi
+    subscribes_to="$(
+        sh -c ". '$WMRC_CONFIG/modules/$1' && echo \$WMRC_SUBSCRIBES_TO" | sed 's/ \{1,\}/\n/g'
+    )"
+    debug "$subscribes_to"
+}
+
 call() {
     if [ -z "$1" ]; then
         error 'Module name not provided'
@@ -127,6 +139,18 @@ start() {
 
 stop() {
     daemon_kill "$1"
+}
+
+handle_event() {
+    # This handle_event -> handles pattern allows modules to explicitly disable event handling by setting WMRC_EVENT_MODE to false
+    if [ "$WMRC_EVENT_MODE" != 'false' ]; then
+        handles "$*" 
+    fi
+}
+
+handles() {
+    error "Handle method not defined"
+    return 1
 }
 
 restart() {

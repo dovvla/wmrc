@@ -18,7 +18,34 @@ module_exec() {
     if [ "$WMRC_CHECK_DEPS" != 'false' ]; then
         check_dependencies "$1"
     fi
+    
     eval "call $*"
+
+    debug 'Notifying subscribers module executed:' "$1"
+    eval "publish_event $1"
+}
+
+publish_event() {
+    _modules="$(find "$WMRC_CONFIG/modules" -type f -printf '%P\n')"
+    handlers=""
+    subscribes_to=""
+    for m in $_modules; do
+        # Prevent circular invocations, this can be changed to be configurable
+        # Maybe circual invocations are fine, or even wanted in some cases
+        if echo "$m" | grep -qi "$1"; then
+            continue
+        fi
+        _subscribes_to "$m"
+        if echo "$subscribes_to" | grep -qi "$1"; then
+            handlers="$handlers $m"
+        fi
+    done
+    # Remove duplicates, but in reality there should not be any 
+    handlers="$(echo "$handlers" | sed 's| |\n|g' | sort | uniq)"
+    echo "$handlers" | grep -v "^$" | while read -r h; do
+        debug "Notifying $h"
+        echo "module_exec $h handle_event $*" 
+    done
 }
 
 module_list() {
@@ -268,6 +295,7 @@ case "$1" in
         printf '\tmodules\n'
         printf '\tdeps\n'
         printf '\tcheck-deps\n'
+        printf '\tpublish-event <event-identifier> [args...]\n'
         printf '\thelp\n'
         printf '\tversion\n'
         ;;
@@ -313,6 +341,10 @@ case "$1" in
     'check-deps')
         export WMRC_CHECK_DEPS=true
         check_dependencies
+        ;;
+    'publish-event')
+        shift 1
+        publish_event "$1"
         ;;
     'logs')
         case "$2" in
