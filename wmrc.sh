@@ -344,7 +344,7 @@ case "$1" in
         ;;
     'publish-event')
         shift 1
-        publish_event "$1"
+        publish_event "$*"
         ;;
     'logs')
         case "$2" in
